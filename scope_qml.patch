@@ -1,0 +1,149 @@
+diff --git a/friture/Scope.qml b/friture/Scope.qml
+index 6ab3fb1a4528976a3c317dfcc9eaa6ca5f9fac6f..0a3e773f075215f3d4bbc412cffb7c2765d80a70 100644
+--- a/friture/Scope.qml
++++ b/friture/Scope.qml
+@@ -1,81 +1,118 @@
+ import QtQuick 2.15
+ import QtQuick.Window 2.2
+ import QtQuick.Layouts 1.15
+ import QtQuick.Shapes 1.15
+ import Friture 1.0
+ import "plotItemColors.js" as PlotItemColors
+ 
+ Plot {
++    id: plotRoot
+     required property var viewModel
+     required property string fixedFont
+ 
+     scopedata: viewModel
+ 
+     // Stage 1: double-click to create trigger (devPlan §1)
+     onAreaDoubleClicked: function(xFrac, yFrac) {
+         const level = viewModel.toLevel(yFrac);
+         viewModel.add_trigger(level);
+     }
+ 
+     // Existing curve(s)
+     Repeater {
+         model: scopedata.plot_items
+         PlotCurve {
+             anchors.fill: parent
+             color: PlotItemColors.color(index)
+             curve: modelData
+         }
+     }
+ 
+-    // Stage 1: draw horizontal trigger lines
+-    Repeater {
+-        model: viewModel.triggers
+-        Rectangle {
+-            // depend on axis ticks so we recompute on range/scale changes
+-            readonly property var __tickDep: viewModel.vertical_axis.scale_division.logicalMajorTicks
+-            readonly property real frac: viewModel.toNormalizedY(modelData.trigger_level) + 0 * viewModel.axis_rev
+-            anchors.left: parent.left
+-            anchors.right: parent.right
+-            y: (1.0 - frac) * parent.height
+-            height: 1
+-            color: "#0B3D91" // dark blue
+-        }
+-    }
+-
+     TriggerParamsDialog {
+         id: triggerParamsDialog
+         viewModel: scopedata
+     }
+ 
+-    // Stage 2: Right-click on trigger line opens the parameter dialog
++    // Stage 1 & 2: trigger line rendering and interactions
+     Repeater {
+         model: viewModel.triggers
+         Item {
+             readonly property var __tickDep: viewModel.vertical_axis.scale_division.logicalMajorTicks
+             readonly property real frac: viewModel.toNormalizedY(modelData.trigger_level) + 0 * viewModel.axis_rev
++            property bool dragActive: false
++            property bool skipNextRelease: false
+ 
+             anchors.left: parent.left
+             anchors.right: parent.right
+             y: (1.0 - frac) * parent.height - 4
+             height: 9
+ 
+             Rectangle {
++                id: triggerLine
+                 anchors.left: parent.left
+                 anchors.right: parent.right
+                 anchors.verticalCenter: parent.verticalCenter
+                 height: 1
+                 color: "#0B3D91"
+-                opacity: 0.001
++                visible: !dragActive
+             }
+ 
+             MouseArea {
++                id: triggerHitArea
+                 anchors.fill: parent
+-                acceptedButtons: Qt.RightButton
+-                onClicked: if (mouse.button === Qt.RightButton) {
+-                    triggerParamsDialog.openFor(modelData)
++                acceptedButtons: Qt.LeftButton | Qt.RightButton
++                preventStealing: true
++                propagateComposedEvents: false
++
++                onPressed: {
++                    if (mouse.button === Qt.LeftButton) {
++                        dragActive = true
++                        skipNextRelease = false
++                        mouse.accepted = true
++                    }
++                }
++
++                onReleased: {
++                    if (mouse.button === Qt.LeftButton) {
++                        if (skipNextRelease) {
++                            skipNextRelease = false
++                            mouse.accepted = true
++                            return
++                        }
++                        if (dragActive) {
++                            dragActive = false
++                            var point = mapToItem(plotRoot, mouse.x, mouse.y)
++                            var clampedY = Math.max(0, Math.min(plotRoot.height, point.y))
++                            var fracY = plotRoot.height > 0 ? clampedY / plotRoot.height : 0
++                            viewModel.update_trigger_level(modelData.id, viewModel.toLevel(fracY))
++                            mouse.accepted = true
++                        }
++                    }
++                }
++
++                onCanceled: {
++                    if (dragActive) {
++                        dragActive = false
++                    }
++                    skipNextRelease = false
++                }
++
++                onClicked: {
++                    if (mouse.button === Qt.RightButton) {
++                        triggerParamsDialog.openFor(modelData)
++                        mouse.accepted = true
++                    }
++                }
++
++                onDoubleClicked: {
++                    if (mouse.button === Qt.LeftButton) {
++                        dragActive = false
++                        skipNextRelease = true
++                    }
++                    mouse.accepted = true
+                 }
+             }
+         }
+     }
+-    
+-}
+\ No newline at end of file
++
++}
+ 
+EOF
+)

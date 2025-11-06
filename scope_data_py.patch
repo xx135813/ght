@@ -1,0 +1,73 @@
+diff --git a/friture/scope_data.py b/friture/scope_data.py
+index abaa8b76c10642ec1b70545b5344a4b4489fd115..1a4c7bc51100fb72b92a9616640ecbce5cea3952 100644
+--- a/friture/scope_data.py
++++ b/friture/scope_data.py
+@@ -149,50 +149,65 @@ class Scope_Data(QtCore.QObject):
+             try:
+                 curve = self._plot_items[0]
+                 y = curve.y_array()
+                 if y is not None and len(y) > 0:
+                     current = float(y[-1])
+             except Exception:
+                 current = None
+         # apply snapshot rule
+         try:
+             t = self._triggers_model._triggers[-1]
+             if current is not None:
+                 t.trigger_bool = (current >= float(level))
+             else:
+                 t.trigger_bool = False
+         except Exception:
+             pass
+         # Update timestamp
+         try:
+             t.level_ts = int(QtCore.QDateTime.currentSecsSinceEpoch())
+         except Exception:
+             import time as _time
+             t.level_ts = int(_time.time())
+         # Notify QML list change
+         self.triggers_changed.emit()
+ 
++    @QtCore.pyqtSlot(int, float)
++    def update_trigger_level(self, trigger_id, level):
++        """Update only the vertical position of an existing trigger line."""
++        try:
++            trigger_id = int(trigger_id)
++            level = float(level)
++        except Exception:
++            logger.debug("Invalid trigger level update: id=%r level=%r", trigger_id, level)
++            return
++
++        try:
++            self._triggers_model.update_level(trigger_id, level)
++        except Exception:
++            logger.exception("Failed to update trigger level")
++
+     @QtCore.pyqtSlot(float, result=float)
+     def toLevel(self, yFrac):
+         """yFrac is 0..1 measured from top; returns axis data value."""
+         ct = self.vertical_axis.coordinate_transform
+         return float(ct.toPlot(1.0 - float(yFrac)))
+ 
+     @QtCore.pyqtSlot(float, result=float)
+     def toNormalizedY(self, level):
+         """Return f in [0,1] (from bottom to top inverted in QML later) such that toPlot(f) ~= level."""
+         ct = self.vertical_axis.coordinate_transform
+         lo, hi = 0.0, 1.0
+         target = float(level)
+         # Bisection
+         for _ in range(32):
+             mid = 0.5 * (lo + hi)
+             val = float(ct.toPlot(mid))
+             if val < target:
+                 lo = mid
+             else:
+                 hi = mid
+         return lo
+ 
+     @pyqtProperty(Axis, constant=True) # type: ignore
+     def horizontal_axis(self):
+         return self._horizontal_axis
+ 
+EOF
+)
