@@ -4,7 +4,7 @@ index abaa8b76c10642ec1b70545b5344a4b4489fd115..1a4c7bc51100fb72b92a9616640ecbce
 +++ b/friture/scope_data.py
 @@ -149,50 +149,65 @@ class Scope_Data(QtCore.QObject):
              try:
-                 curve = self._plot_items[0]22222222
+                 curve = self._plot_items[0]
                  y = curve.y_array()
                  if y is not None and len(y) > 0:
                      current = float(y[-1])
